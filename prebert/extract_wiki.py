@@ -7,9 +7,12 @@ import wikiclean
 
 
 TEXT_PATTERN = re.compile(r'<text xml:space="preserve">(.+)</text>', re.DOTALL)
+REDIRECT_PATTERN = re.compile(r'#REDIRECT.*', re.MULTILINE)
 
 
 def process(lines, clean=True):
+    if len(lines) <= 3:
+        return
     text = ''.join(lines)
     m = TEXT_PATTERN.search(text)
     if not m: 
@@ -18,6 +21,7 @@ def process(lines, clean=True):
     if clean:
         try:
             text = wikiclean.clean(text).strip()
+            text = REDIRECT_PATTERN.sub('', text)
         except:
             return
     if len(text) > 0: print(text)
@@ -25,7 +29,7 @@ def process(lines, clean=True):
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument('--lines', type=int, default=983313469)
+    parser.add_argument('--lines', type=int) # articles has 983313469
     parser.add_argument('--raw', action='store_true')
     args = parser.parse_args()
     lines = []

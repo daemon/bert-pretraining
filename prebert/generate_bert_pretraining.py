@@ -1,4 +1,5 @@
 from typing import Tuple, List
+from io import StringIO
 import argparse
 import random
 import sys
@@ -63,10 +64,12 @@ def main():
                                      epilog='Usage:\ncat data | python -m oscar.run.generate_bert_pretraining_data'
                                             ' --bert-model /path/to/bert > generated.tsv')
     add_dict_options(parser, [
-        OptionEnum.BERT_MODEL.value.required(False),
+        OptionEnum.BERT_MODEL.value.required(False).default('bert-large-uncased'),
         OptionEnum.SEED.value,
         OptionEnum.NO_BERT_TOKENIZE.value,
+        opt('--lines', type=int),
         opt('--print-tokenized', action='store_true'),
+        opt('--generate-data', action='store_true'),
         opt('--dupe-factor', type=int, default=10, help='The replication factor.')
     ])
     args = parser.parse_args()
@@ -78,25 +81,24 @@ def main():
 
     documents = []
     document = []
-    lines = []
-    for line in tqdm(sys.stdin):
-        lines.append(line.strip())
 
-    vocab = set()
-    for line in tqdm(lines):
+    for line in tqdm(sys.stdin, total=args.lines):
         line = line.strip()
-        line = tokenizer(line)
+        if line.startswith('='): continue
+        is_new_doc = line.startswith('<><END OF ARTICLE><>')
+        line = line.strip()
+        line = (line,) if is_new_doc else tokenizer(line)
         if args.print_tokenized: print(' '.join(line))
-        if len(line) == 1 and line[0] == '':
+        if is_new_doc:
             if len(document) > 0: documents.append(document)
             document = []
-        else:
+        elif not args.print_tokenized:
             document.append(line)
-        vocab.update(line)
     if len(document) > 0:
         documents.append(document)
-    vocab = list(vocab)
-    generate_data(documents, vocab, args.dupe_factor)
+    if args.generate_data:
+        bert_tokenizer = BertTokenizer.from_pretrained(args.bert_model, do_lower_case=True)
+        generate_data(documents, list(bert_tokenizer.vocab.keys()), args.dupe_factor)
 
 
 if __name__ == '__main__':
